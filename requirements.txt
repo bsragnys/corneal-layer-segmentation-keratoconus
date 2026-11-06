@@ -1,0 +1,11 @@
+numpy>=1.26
+pandas>=2.0
+scipy>=1.11
+scikit-image>=0.21
+scikit-learn>=1.3
+pydicom>=2.4
+torch>=2.1
+xgboost>=2.0
+shap>=0.44
+tqdm
+# R (classification/univariate_tests.R): clusrank
