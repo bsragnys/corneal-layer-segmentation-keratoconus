@@ -1,0 +1,5 @@
+{
+  "comment": "Person-level split of the segmentation pool (29 persons, 674 images). The person identifier is the part of the image stem before the first underscore. The 11 test persons were fixed before training; the remaining persons were divided into training (16) and validation (2) with train_test_split(test_size=0.25, random_state=42) after forcing the listed persons into training. Identifiers are study-specific and are not distributed; fill in your own.",
+  "fixed_test_persons": [],
+  "forced_train_persons": []
+}

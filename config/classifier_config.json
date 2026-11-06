@@ -1,0 +1,12 @@
+{
+  "classifier": "XGBoost",
+  "main_chain": {"n_estimators": 200, "max_depth": 3, "learning_rate": 0.1, "subsample": 0.9, "colsample_bytree": 0.9,
+                 "missing_value_code": -999, "random_state": 42},
+  "stable8_run": {"n_estimators": 300, "max_depth": 3, "learning_rate": 0.05, "subsample": 0.9, "colsample_bytree": 0.9,
+                  "reg_lambda": 1.0, "missing_values": "median of the development set", "bootstrap": 1000, "random_state": 42},
+  "within_fold_selection": {"ranking": "univariate AUC inside the training fold", "redundancy_threshold_abs_r": 0.90, "max_features": 12},
+  "stable8_features": ["A_K_oran", "A_pachy_min", "B_epi_z4", "A_tp_dis_merkez_mm", "B_bow_z1", "B_desc_z5", "C_Kant_epi_z2", "C_str_apex_pachy"],
+  "threshold": "Youden index on the out-of-fold probabilities of the development set, carried unchanged",
+  "bootstrap_resamples": 2000,
+  "clustering_unit": "person"
+}

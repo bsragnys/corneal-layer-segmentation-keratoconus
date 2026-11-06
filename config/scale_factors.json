@@ -1,0 +1,9 @@
+{
+  "description": "Fixed, format-specific scale factors applied to the absolute thickness biomarkers (the four pachymetry biomarkers of group A and all group B biomarkers); group C is not scaled (Section 2.6). The factors were derived from a comparison of raw mask thicknesses with the ANTERION outputs (Section 2.7): narrow format from 14 persons, wide format from 27 eyes of the device-agreement sample.",
+  "factors": {
+    "narrow": null,
+    "wide": null
+  },
+  "availability": "The numerical values of the two factors are not distributed with this repository and are available from the authors on request. Enter them under \"factors\" before running measurement/build_feature_table.py or classification/sensitivity_bowman.py.",
+  "format_rule": "wide if the exported DICOM has >= 1500 columns, otherwise narrow (Table S1)"
+}
