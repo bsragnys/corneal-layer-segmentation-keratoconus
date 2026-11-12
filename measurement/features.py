@@ -13,8 +13,13 @@ present; total perpendicular thickness within 0.5-1.5 x the image median and wit
 images with fewer than 150 valid columns are not measured. Ring zones z1-z5 are defined by the
 horizontal distance from the vertex of a conic fitted to the anterior surface; the apex window is
 +-0.5 mm around the thinnest point; asymmetry = |mean(left half) - mean(right half)| with the halves
-split at the vertex. Keratometry K = (1.3375 - 1) / R from the apical radius of a conic fitted to
-each surface or interface with a robust (MAD) refit.
+split at the vertex. Anterior keratometry is computed in the 3 mm central ring used for simulated
+keratometry (SimK): the vertex is located with a conic fitted within +-4 mm of the highest point
+(robust MAD refit), a robust fourth-degree polynomial is fitted to the anterior surface within
++-2.5 mm of the vertex, and at h = 1.5 mm on each side of the polynomial minimum the axial radius
+r = h * sqrt(1 + z'^2) / |z'| gives K = (1.3375 - 1) / r; the anterior K is the mean of the two
+sides. Posterior and interface keratometry K = (1.3375 - 1) / R from the apical radius of a conic
+fitted to each surface or interface with a robust (MAD) refit.
 """
 import numpy as np
 from scipy import ndimage
@@ -24,6 +29,9 @@ from scipy.optimize import curve_fit
 MIN_VALID_COLUMNS = 150
 N_KERATO = 1.3375
 APEX_HALF_MM = 0.5
+SIMK_RING_MM = 1.5          # half of the 3 mm SimK ring
+SIMK_WINDOW_MM = 2.5        # half-width of the polynomial fitting window
+SIMK_DEGREE = 4
 LAYERS = {"epi": 2, "bow": 3, "str": 4, "desc": 5}     # training grid coding (0 background, 1 tear film)
 
 
@@ -59,6 +67,64 @@ def fit_conic(x, z):
 
 def keratometry(R):
     return (N_KERATO - 1.) / (R / 1000.) if (np.isfinite(R) and R > 0) else np.nan
+
+
+def _simk_vertex(x, z):
+    """Lateral position (mm) of the vertex of a conic fitted within +-4 mm of the highest point."""
+    xm = x[np.argmin(z)]
+    s = np.abs(x - xm) <= 4.0
+    xx, zz = x[s] - xm, z[s] - z[s].min()
+    if xx.size < 50:
+        return float(xm)
+    try:
+        p, _ = curve_fit(conic_off, xx, zz, p0=[7.8, -.26, 0., 0.], bounds=([3., -5., -3., -1.], [15., 2., 3., 1.]), maxfev=10000)
+        res = zz - conic_off(xx, *p)
+        mad = 1.4826 * np.median(np.abs(res - np.median(res)))
+        keep = np.abs(res - np.median(res)) <= max(3 * mad, 1e-6)
+        if keep.sum() >= 50 and keep.sum() < xx.size:
+            p, _ = curve_fit(conic_off, xx[keep], zz[keep], p0=p, bounds=([3., -5., -3., -1.], [15., 2., 3., 1.]), maxfev=10000)
+        return float(xm + p[2])
+    except Exception:
+        return float(xm)
+
+
+def _robust_polyfit(u, w, degree=SIMK_DEGREE):
+    """Polynomial fit with up to three refits after removing points beyond 3 x 1.4826 x MAD."""
+    c = np.polyfit(u, w, degree)
+    for _ in range(3):
+        res = w - np.polyval(c, u)
+        mad = 1.4826 * np.median(np.abs(res - np.median(res)))
+        keep = np.abs(res - np.median(res)) <= max(3 * mad, 1e-6)
+        if keep.sum() < 100 or keep.all():
+            break
+        c = np.polyfit(u[keep], w[keep], degree); u, w = u[keep], w[keep]
+    return c
+
+
+def simk_keratometry(x_mm, z_mm, ring=SIMK_RING_MM, window=SIMK_WINDOW_MM):
+    """Anterior keratometry (D) from the axial curvature in the 3 mm SimK ring of an anterior
+    surface profile (x lateral, z depth; mm). Returns nan if it cannot be computed."""
+    x = np.asarray(x_mm, float); z = np.asarray(z_mm, float)
+    fin = np.isfinite(x) & np.isfinite(z); x, z = x[fin], z[fin]
+    if x.size < 100:
+        return np.nan
+    x0 = _simk_vertex(x, z)
+    if x.min() > x0 - ring - 0.3 or x.max() < x0 + ring + 0.3:
+        return np.nan
+    s = np.abs(x - x0) <= window
+    if s.sum() < 100:
+        return np.nan
+    c = _robust_polyfit(x[s] - x0, z[s])
+    uu = np.linspace(-0.6, 0.6, 1201)
+    uv = float(uu[np.argmin(np.polyval(c, uu))])
+    d = np.polyder(c); K = []
+    for side in (-1, 1):
+        slope = float(np.polyval(d, uv + side * ring))
+        if side * slope <= 0:
+            return np.nan
+        r = ring * np.sqrt(1 + slope ** 2) / abs(slope)
+        K.append((N_KERATO - 1) * 1000.0 / r)
+    return float(np.mean(K))
 
 
 def extract_features(mask, px, py):
@@ -116,7 +182,6 @@ def extract_features(mask, px, py):
         sm = medfilt(tot[cols], 7); tp_i = int(cols[int(np.argmin(sm))])
         pachy_min = float(np.min(sm))
     # vertex of the conic fitted to the anterior surface = zone centre
-    Ra, _ = fit_conic(cols * px, a_r[cols] * py)
     xm = (cols * px)[np.argmin(a_r[cols] * py)]
     xx = cols * px - xm; zz = a_r[cols] * py - (a_r[cols] * py).min()
     try:
@@ -137,7 +202,7 @@ def extract_features(mask, px, py):
 
     f = {"kalite_sutun": int(ok.sum()), "v2_merkez_tp_fark_mm": float(abs(centre - tp_i) * px)}
     Rp, _ = fit_conic(cols * px, p_r[cols] * py)
-    Ka, Kp = keratometry(Ra), keratometry(Rp)
+    Ka, Kp = simk_keratometry(cols * px, a_r[cols] * py), keratometry(Rp)
     f["A_pachy_min"] = pachy_min
     f["A_pachy_apex"] = mean_of(tot, ap)
     f["A_pachy_global"] = mean_of(tot, ok)
