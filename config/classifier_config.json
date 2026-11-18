@@ -1,12 +1,18 @@
 {
   "classifier": "XGBoost",
-  "main_chain": {"n_estimators": 200, "max_depth": 3, "learning_rate": 0.1, "subsample": 0.9, "colsample_bytree": 0.9,
-                 "missing_value_code": -999, "random_state": 42},
-  "stable8_run": {"n_estimators": 300, "max_depth": 3, "learning_rate": 0.05, "subsample": 0.9, "colsample_bytree": 0.9,
-                  "reg_lambda": 1.0, "missing_values": "median of the development set", "bootstrap": 1000, "random_state": 42},
-  "within_fold_selection": {"ranking": "univariate AUC inside the training fold", "redundancy_threshold_abs_r": 0.90, "max_features": 12},
-  "stable8_features": ["A_K_oran", "A_pachy_min", "B_epi_z4", "A_tp_dis_merkez_mm", "B_bow_z1", "B_desc_z5", "C_Kant_epi_z2", "C_str_apex_pachy"],
-  "threshold": "Youden index on the out-of-fold probabilities of the development set, carried unchanged",
+  "settings": {"n_estimators": 200, "max_depth": 3, "learning_rate": 0.1, "subsample": 0.9, "colsample_bytree": 0.9,
+               "missing_value_code": -999, "random_state": 42},
+  "hyperparameter_tuning": "none; the settings were fixed before the analysis",
+  "feature_arms": {"A": 11, "B": 32, "C": 6, "A+B": 43, "A+C": 17, "B+C": 38, "A+B+C": 49},
+  "feature_selection": "none; there is no data-driven feature selection",
+  "paired_comparisons_defined_in_advance": ["A+B - A", "A+C - A", "A+B+C - A"],
+  "additional_paired_comparison": "A+B+C - A+C",
+  "threshold": "Youden point of the pooled out-of-fold probabilities of the development set; the final model is trained on the whole development set; model and threshold are carried unchanged to the independent set",
+  "standard_parameters_alone": ["A_pachy_min", "A_pachy_apex", "A_pachy_global", "A_K_ant", "A_K_post", "A_K_oran", "A_tp_dis_merkez_mm", "A_pachy_asimetri"],
+  "other_classifiers": {
+    "logistic_regression": {"penalty": "L2", "C": 1.0, "missing_values": "median of the training persons", "features": "standardised"},
+    "random_forest": {"n_estimators": 300, "min_samples_leaf": 2, "missing_values": "median of the training persons", "random_state": 42}
+  },
   "bootstrap_resamples": 2000,
   "clustering_unit": "person"
 }
