@@ -8,6 +8,13 @@ to the grey level, giving the 640 x 640 x 3 network input.
 
 In the measurement chain, images whose axial sampling interval differs from the training grid
 (9.243 um) by more than 5% are resampled axially to that interval before segmentation.
+
+Export type. Sections exported without refraction correction are identified from the image itself,
+not from the file name or the DICOM fields: the correlation between neighbouring columns is
+computed in the high-pass-filtered upper half of the exported image, and images whose correlation
+is below a threshold of 0.5, fixed in advance, are treated as uncorrected (speckle is correlated
+between neighbouring columns in laterally resampled exports but not in uncorrected ones). The
+uncorrected sections are corrected by ray tracing before measurement (measurement/refraction.py).
 """
 import numpy as np
 import pydicom
@@ -16,6 +23,8 @@ from scipy.ndimage import zoom
 
 CROP_SIZE = 640
 PY_REF = 0.009243          # axial sampling interval of the training grid, mm
+PX_REF = 0.015738          # lateral sampling interval of the training grid, mm
+EXPORT_TYPE_THRESHOLD = 0.5
 IGNORE_INDEX = 255
 # original label codes in the masks -> training class indices
 ORIGINAL_TO_TRAIN = {0: 0, 2: 1, 3: 2, 4: 3, 5: 4, 6: 5, 7: IGNORE_INDEX}
@@ -121,6 +130,31 @@ def read_dicom(path, resample_axial=True):
             img = zoom(img, (fy, 1.0), order=1)
             py = PY_REF
     return img, px, py
+
+
+def read_dicom_pixels(path):
+    """Pixel array of a DICOM section as stored (first frame), without rescaling or resampling."""
+    a = pydicom.dcmread(path, force=True).pixel_array
+    if a.ndim == 3:
+        a = a[0] if a.shape[0] < a.shape[-1] else a[..., 0]
+    return a
+
+
+def neighbouring_column_correlation(img):
+    """Correlation between neighbouring columns in the high-pass-filtered upper half of an
+    exported image (to be computed on the stored image, before any resampling)."""
+    a = np.asarray(img).astype(np.float32)
+    b = a[: a.shape[0] // 2]
+    b = b - b.mean(1)[:, None]
+    hp = b - (np.roll(b, 2, 0) + np.roll(b, -2, 0) + np.roll(b, 2, 1) + np.roll(b, -2, 1)) / 4
+    hp = hp[5:-5, 5:-5]
+    return float((hp[:, 1:] * hp[:, :-1]).mean() / (hp.var() + 1e-9))
+
+
+def is_refraction_corrected(img, threshold=EXPORT_TYPE_THRESHOLD):
+    """Export type from the image itself: True for refraction-corrected, laterally resampled
+    exports, False for uncorrected ones."""
+    return neighbouring_column_correlation(img) >= threshold
 
 
 def network_input(img640):
