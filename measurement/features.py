@@ -245,19 +245,23 @@ def extract_features(mask, px, py):
 SCALED_A = ("A_pachy_min", "A_pachy_apex", "A_pachy_global", "A_pachy_asimetri")
 
 
-def apply_scale_factor(f, fmt, factors):
-    """Bring absolute thickness biomarkers to the common (device) scale with the fixed,
-    format-specific factor (Section 2.6; config/scale_factors.json). Group C is not scaled."""
+def apply_scale_factor(f, factor):
+    """Multiply the thickness biomarkers (the four pachymetric biomarkers of group A and all
+    biomarkers of group B) by the single common scale factor (Section 2.6;
+    config/scale_factors.json). Group C is not scaled. The same factor is applied to both export
+    formats, after the refraction correction of the uncorrected sections."""
     out = dict(f)
     for c in SCALED_A:
         if c in out and out[c] is not None:
-            out[c] *= factors[fmt]
+            out[c] *= factor
     for c in list(out):
         if c.startswith("B_") and out[c] is not None:
-            out[c] *= factors[fmt]
+            out[c] *= factor
     return out
 
 
 def export_format(n_columns):
-    """Format group from the number of columns of the exported DICOM (Table S1)."""
+    """Format group (geometry of the exported image) from the number of columns of the DICOM
+    (Table S1). The export type, with or without refraction correction, is determined from the
+    image itself (segmentation/preprocessing.py)."""
     return "wide" if n_columns >= 1500 else "narrow"
